@@ -1,0 +1,899 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import tempfile
+
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+
+st.set_page_config(
+    page_title="Visualización de Resultados",
+    layout="wide",
+)
+
+st.markdown("""
+<style>
+
+:root {
+    --main-color: #1a4ba3;        /* azul profesional */
+    --main-light: #e9f0fb;        /* azul muy claro */
+    --text-dark: #1d1d1d;
+    --text-light: #5c5c5c;
+    --border-soft: #d9d9d9;
+}
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ----- TITULOS ----- */
+h1 {
+    color: var(--main-color) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.5px;
+}
+
+h2, h3 {
+    color: var(--text-dark) !important;
+    font-weight: 700 !important;
+}
+
+h4, h5 {
+    color: var(--text-light) !important;
+}
+
+/* ----- TARJETAS DE MÉTRICA ----- */
+.metric-card {
+    padding: 1.2rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-soft);
+    background-color: #ffffff;
+    box-shadow: 0px 3px 10px rgba(0,0,0,0.07);
+    text-align: center;
+}
+
+.metric-title {
+    font-size: 0.95rem;
+    color: var(--main-color);
+    font-weight: 600;
+}
+
+.metric-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--text-dark);
+    margin-top: -8px;
+}
+
+/* ----- DIVIDER ----- */
+.divider {
+    border-bottom: 2px solid var(--border-soft);
+    margin: 1.3rem 0 1.3rem 0;
+}
+
+/* ----- WIDGETS (select, multiselect, slider…) ----- */
+.stSelectbox > div > div,
+.stMultiSelect > div > div {
+    border: 1px solid var(--main-color) !important;
+    border-radius: 10px !important;
+}
+
+.st-bf {
+    color: var(--main-color) !important;
+}
+
+/* ----- TABLA ----- */
+[data-testid="stDataFrame"] thead tr th {
+    background-color: var(--main-light) !important;
+    color: var(--main-color) !important;
+    font-weight: 700 !important;
+}
+
+/* ----- BOTONES DE FILTRO EN MULTISELECT ----- */
+.stMultiSelect [data-baseweb="tag"] {
+    background-color: var(--main-light) !important;
+    color: var(--main-color) !important;
+    border-radius: 6px;
+}
+
+/* ----- TOOLBAR PLOTLY ----- */
+.plotly .modebar-group * {
+    color: var(--main-color) !important;
+}
+
+/* Remove Streamlit footer */
+footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+
+ESTADOS = ["A FAVOR", "EN CONTRA", "AUSENTE", "LICENCIA"]
+EXCEL_6433 = "analisis_votaciones.xlsx"
+EXCEL_6625 = "analisis_votaciones_presupuesto.xlsx"
+
+# ============ Funciones comunes ============
+
+def normalizar_estado(s):
+    s = str(s).strip().upper()
+    s = s.replace("Á", "A")
+    for e in ESTADOS:
+        if s == e:
+            return e
+    return s
+
+def normalizar_bloque(s):
+    s = str(s)
+    s = " ".join(s.split())   # colapsa espacios internos
+    s = s.strip().upper()
+    return s
+
+def agregar_categoria_cambio(df):
+    if "categoria_cambio" in df.columns:
+        return df
+    def clasificar_cambio(row):
+        v1 = row["voto_1"]
+        v2 = row["voto_2"]
+        if v1 == v2:
+            return "Se mantiene"
+        if (v1 == "A FAVOR" and v2 == "EN CONTRA") or (v1 == "EN CONTRA" and v2 == "A FAVOR"):
+            return "Cambia opinión Favor/Contra"
+        if v1 in ["AUSENTE", "LICENCIA"] and v2 in ["A FAVOR", "EN CONTRA"]:
+            return "Se activa (no votaba → vota)"
+        if v1 in ["A FAVOR", "EN CONTRA"] and v2 in ["AUSENTE", "LICENCIA"]:
+            return "Se desactiva (votaba → no vota)"
+        if v1 in ["AUSENTE", "LICENCIA"] and v2 in ["AUSENTE", "LICENCIA"]:
+            return "Cambia tipo de no voto"
+        return "Otro cambio"
+    df["categoria_cambio"] = df.apply(clasificar_cambio, axis=1)
+    return df
+
+def calcular_kpis_basicos(df):
+    total_iguales = (df["voto_1"] == df["voto_2"]).sum()
+    favor_a_contra = ((df["voto_1"] == "A FAVOR") & (df["voto_2"] == "EN CONTRA")).sum()
+    contra_a_favor = ((df["voto_1"] == "EN CONTRA") & (df["voto_2"] == "A FAVOR")).sum()
+    se_desactivan = (
+        df["voto_1"].isin(["A FAVOR", "EN CONTRA"]) &
+        df["voto_2"].isin(["AUSENTE", "LICENCIA"])
+    ).sum()
+    se_activan = (
+        df["voto_1"].isin(["AUSENTE", "LICENCIA"]) &
+        df["voto_2"].isin(["A FAVOR", "EN CONTRA"])
+    ).sum()
+    return total_iguales, favor_a_contra, contra_a_favor, se_desactivan, se_activan
+
+def conteos_por_estado(df):
+    favor_1   = (df["voto_1"] == "A FAVOR").sum()
+    contra_1  = (df["voto_1"] == "EN CONTRA").sum()
+    aus_1     = (df["voto_1"] == "AUSENTE").sum()
+    lic_1     = (df["voto_1"] == "LICENCIA").sum()
+
+    favor_2   = (df["voto_2"] == "A FAVOR").sum()
+    contra_2  = (df["voto_2"] == "EN CONTRA").sum()
+    aus_2     = (df["voto_2"] == "AUSENTE").sum()
+    lic_2     = (df["voto_2"] == "LICENCIA").sum()
+
+    return (favor_1, contra_1, aus_1, lic_1,
+            favor_2, contra_2, aus_2, lic_2)
+
+def resultado_global(favor_2, contra_2):
+    if favor_2 > contra_2:
+        return "APROBADO", "#d5f5dd", "#1a7a33"
+    elif contra_2 > favor_2:
+        return "NO APROBADO", "#f8d6d6", "#b32121"
+    else:
+        return "EMPATE", "#e2e2e2", "#444444"
+
+# === Helper para guardar archivos subidos ===
+def save_uploaded_file(uploaded_file, prefix="file_"):
+    suffix = ""
+    if "." in uploaded_file.name:
+        suffix = "." + uploaded_file.name.split(".")[-1]
+    fd, path = tempfile.mkstemp(prefix=prefix, suffix=suffix)
+    with os.fdopen(fd, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return path
+
+# === Aquí conectas tus scripts de Markov / PDFs ===
+def run_markov_pipeline(pdf1_path, id1, pdf2_path, id2):
+    """
+    Ejecuta tu flujo:
+      1. PDF -> Excel
+      2. Markov / cálculos
+      3. Genera Excel final que alimenta el dashboard.
+
+    Devuelve la ruta del Excel generado.
+    """
+    # TODO: Reemplaza este bloque con tus scripts reales.
+    # EJEMPLO (pseudocódigo):
+    #
+    #   excel_1 = pdf_to_excel(pdf1_path, id1)
+    #   excel_2 = pdf_to_excel(pdf2_path, id2)
+    #   output_excel = build_dashboard_input(excel_1, excel_2, id1, id2)
+    #
+    # Por ahora solo devolvemos el nombre base de siempre:
+    output_excel = "analisis_votaciones.xlsx"
+    return output_excel
+
+# ============ Sidebar ============
+
+with st.sidebar:
+    st.title("Visualización de Resultados")
+    seccion = st.radio(
+        "Comportamiento en Votaciones",
+        ["6433 - Participación de CACIF en la Comisión de Infraestructura ANADIE",
+         "6625 - Aprobación de Presupuesto"],
+        index=0
+    )
+    st.markdown("---")
+
+    # --- Controles extra SOLO para la opción de carga ---
+    if seccion.startswith("Carga"):
+        st.subheader("Carga de nuevos PDFs")
+
+        pdf1 = st.file_uploader("Archivo PDF 1 (por ejemplo: 2ª vuelta CACIF)", type=["pdf"], key="pdf1")
+        id1 = st.text_input("Identificador 1 (ej. 6433_2v)", key="id1")
+
+        pdf2 = st.file_uploader("Archivo PDF 2 (por ejemplo: Presupuesto)", type=["pdf"], key="pdf2")
+        id2 = st.text_input("Identificador 2 (ej. 6625)", key="id2")
+
+        procesar = st.button("Generar archivo para dashboard")
+
+        if procesar:
+            if not (pdf1 and pdf2 and id1 and id2):
+                st.error("Por favor carga los dos archivos y llena ambos identificadores.")
+            else:
+                with st.spinner("Procesando archivos y generando Excel..."):
+                    pdf1_path = save_uploaded_file(pdf1, prefix="vot1_")
+                    pdf2_path = save_uploaded_file(pdf2, prefix="vot2_")
+
+                    output_excel = run_markov_pipeline(pdf1_path, id1, pdf2_path, id2)
+
+                st.success("Archivos procesados correctamente ✅")
+                st.info(f"Excel generado: **{output_excel}**. "
+                        "Si usas el mismo nombre que EXCEL_6433 o EXCEL_6625, "
+                        "al recargar la app se actualizarán los dashboards.")
+
+    st.caption("Aquí después metemos más tabs y filtros globales ✨")
+
+# ======================================================
+#  SECCIÓN 6433 – 1ª vs 2ª vuelta participación CACIF
+# ======================================================
+if seccion.startswith("6433"):
+
+    # === Cargar datos ===
+    merged = pd.read_excel(EXCEL_6433, sheet_name="Votos_unidos")
+    merged.columns = [c.strip() for c in merged.columns]
+
+    merged["voto_1"] = merged["voto_1"].map(normalizar_estado)
+    merged["voto_2"] = merged["voto_2"].map(normalizar_estado)
+    merged["bloque_norm"] = merged["bloque_1"].map(normalizar_bloque)
+    merged = agregar_categoria_cambio(merged)
+
+    (favor_1, contra_1, aus_1, lic_1,
+     favor_2, contra_2, aus_2, lic_2) = conteos_por_estado(merged)
+
+    total_iguales, favor_a_contra, contra_a_favor, se_desactivan, se_activan = calcular_kpis_basicos(merged)
+    resultado_texto, bg_color, fg_color = resultado_global(favor_2, contra_2)
+
+    # === Main ===
+    st.title("Votaciones Iniciativa 6466")
+
+    # ---------- Resumen por vuelta ----------
+    st.subheader("Resumen de votos por vuelta")
+
+    # CSS adicional para tarjetas y divisor
+    st.markdown("""
+    <style>
+    .metric-card {
+        padding: 1rem;
+        border-radius: 12px;
+        border: 1px solid #e6e6e6;
+        background-color: #ffffff;
+        box-shadow: 0px 2px 6px rgba(0,0,0,0.05);
+        text-align: center;
+    }
+    .metric-title {
+        font-size: 0.85rem;
+        color: #5c5c5c;
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-top: -8px;
+    }
+    .divider {
+        border-bottom: 2px solid #dddddd;
+        margin: 1rem 0 1.2rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Primera vuelta
+    st.markdown("### Primera vuelta")
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">A FAVOR (1ª)</div>
+            <div class="metric-value">{favor_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">EN CONTRA (1ª)</div>
+            <div class="metric-value">{contra_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">AUSENTE (1ª)</div>
+            <div class="metric-value">{aus_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">LICENCIA (1ª)</div>
+            <div class="metric-value">{lic_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Línea divisoria entre vueltas
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+    # Segunda vuelta
+    st.markdown("### Segunda vuelta")
+    d1, d2, d3, d4 = st.columns(4)
+
+    with d1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">A FAVOR (2ª)</div>
+            <div class="metric-value">{favor_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with d2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">EN CONTRA (2ª)</div>
+            <div class="metric-value">{contra_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with d3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">AUSENTE (2ª)</div>
+            <div class="metric-value">{aus_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with d4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">LICENCIA (2ª)</div>
+            <div class="metric-value">{lic_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Banner de resultado global 2ª vuelta
+    st.markdown(
+        f"""
+        <div style="
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.6rem;
+            background-color: {bg_color};
+            color: {fg_color};
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 700;">
+            Resultado 2ª vuelta: {resultado_texto}
+            <span style="font-weight: 400; margin-left: 1rem;">
+                (A favor: {favor_2}, En contra: {contra_2})
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ---------- KPIs de comportamiento entre vueltas ----------
+    st.subheader("Comportamiento entre 1ª y 2ª vuelta")
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Misma votación", total_iguales)
+    col2.metric("A FAVOR → EN CONTRA", favor_a_contra)
+    col3.metric("EN CONTRA → A FAVOR", contra_a_favor)
+    col4.metric("Se desactivaron (votaban → no)", se_desactivan)
+    col5.metric("Se activaron (no votaban → votan)", se_activan)
+
+    st.markdown("---")
+
+    # =======================
+    #  Transiciones por bloque
+    # =======================
+
+    st.subheader("Votaciones por bloque")
+
+    bloques = sorted(merged["bloque_norm"].dropna().unique())
+    bloques = ["TODOS"] + bloques
+
+    bloque_sel = st.selectbox("Selecciona un bloque", options=bloques)
+
+    # Data filtrada por bloque (para heatmap + tabla)
+    if bloque_sel == "TODOS":
+        df_b = merged.copy()
+    else:
+        df_b = merged[merged["bloque_norm"] == bloque_sel].copy()
+
+    # --- Heatmap ---
+    mat_bloque = (
+        df_b
+        .groupby(["voto_1", "voto_2"])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(index=ESTADOS, columns=ESTADOS, fill_value=0)
+    )
+
+    titulo_bloque = "TODOS" if bloque_sel == "TODOS" else bloque_sel
+
+    fig_heat = px.imshow(
+        mat_bloque,
+        text_auto=True,
+        labels=dict(x="Voto 2ª vuelta", y="Voto 1ª vuelta", color="Conteo"),
+        x=mat_bloque.columns,
+        y=mat_bloque.index,
+        title=f"Transiciones de voto - Bloque {titulo_bloque}",
+    )
+    st.plotly_chart(fig_heat, use_container_width=True)
+
+    # --- Tabla de detalle (mismo filtro de bloque) ---
+    st.markdown(f"### Detalle de diputados del bloque {titulo_bloque}")
+
+    # Filtros en dos columnas: tipo de comportamiento (izq) y voto 2ª vuelta (der)
+    fcol1, fcol2 = st.columns([2, 1])
+
+    with fcol1:
+        tipo_cambio_bloque = st.multiselect(
+            "Filtrar por tipo de comportamiento",
+            options=sorted(df_b["categoria_cambio"].unique()),
+            default=sorted(df_b["categoria_cambio"].unique())
+        )
+
+    with fcol2:
+        opciones_voto2 = ["Todos"] + ESTADOS
+        voto2_sel = st.selectbox(
+            "Filtrar por voto 2ª vuelta",
+            options=opciones_voto2,
+            index=0
+        )
+
+    df_detalle = df_b[df_b["categoria_cambio"].isin(tipo_cambio_bloque)].copy()
+
+    # aplicar filtro por voto 2ª vuelta si no es "Todos"
+    if voto2_sel != "Todos":
+        df_detalle = df_detalle[df_detalle["voto_2"] == voto2_sel]
+
+    df_detalle = df_detalle.rename(columns={
+        "nombre": "Nombre",
+        "bloque_1": "Bloque",
+        "voto_1": "Voto 1ª vuelta",
+        "voto_2": "Voto 2ª vuelta",
+        "categoria_cambio": "Categoría de Cambio",
+    })
+
+    df_detalle = df_detalle[
+        ["Nombre", "Bloque", "Voto 1ª vuelta", "Voto 2ª vuelta", "Categoría de Cambio"]
+    ].sort_values(["Bloque", "Nombre"])
+
+    st.dataframe(df_detalle, use_container_width=True)
+
+    st.markdown("---")
+
+    # =======================
+    #  Gráfico de barras por bloque - todos los cambios
+    # =======================
+
+    st.subheader("Cambios de voto por bloque - Todos los bloques")
+
+    resumen_bloques = (
+        merged
+        .groupby(["bloque_norm", "categoria_cambio"])
+        .size()
+        .reset_index(name="Diputados")
+        .rename(columns={
+            "bloque_norm": "Bloque",
+            "categoria_cambio": "Categoría de Cambio"
+        })
+    )
+
+    fig_bar = px.bar(
+        resumen_bloques,
+        x="Bloque",
+        y="Diputados",
+        color="Categoría de Cambio",
+        title="Cambios de voto por bloque",
+        labels={"Bloque": "Bloque", "Diputados": "Diputados"},
+    )
+
+    # ordenar bloques de mayor a menor total de diputados
+    fig_bar.update_layout(
+        xaxis_tickangle=-45,
+        xaxis=dict(categoryorder="total descending"),
+        height=700,
+        margin=dict(t=60),
+    )
+
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+    # =======================
+    #  Gráfica stacked: se mantienen A FAVOR / EN CONTRA por bloque
+    # =======================
+
+    st.subheader("Diputados que mantuvieron su voto (A FAVOR / EN CONTRA) por bloque")
+
+    df_mantienen = merged[
+        (merged["voto_1"] == merged["voto_2"]) &
+        (merged["voto_1"].isin(["A FAVOR", "EN CONTRA"]))
+    ].copy()
+
+    if df_mantienen.empty:
+        st.info("No hay diputados que se mantuvieran A FAVOR o EN CONTRA en ambas vueltas.")
+    else:
+        resumen_mantienen = (
+            df_mantienen
+            .groupby(["bloque_norm", "voto_2"])
+            .size()
+            .reset_index(name="Diputados")
+            .rename(columns={
+                "bloque_norm": "Bloque",
+                "voto_2": "Voto"
+            })
+        )
+
+        fig_mant = px.bar(
+            resumen_mantienen,
+            x="Bloque",
+            y="Diputados",
+            color="Voto",
+            title="Diputados que mantuvieron su voto por bloque",
+            labels={"Bloque": "Bloque", "Diputados": "Diputados", "Voto": "Voto"},
+            color_discrete_map={
+                "EN CONTRA": "#e74c3c",  # rojo
+                "A FAVOR": "#27ae60"     # verde
+            },
+        )
+
+        # barras apiladas y bloques ordenados de mayor a menor total
+        fig_mant.update_layout(
+            barmode="stack",
+            xaxis_tickangle=-45,
+            xaxis=dict(categoryorder="total descending"),
+            height=650,
+            margin=dict(t=60),
+        )
+
+        st.plotly_chart(fig_mant, use_container_width=True)
+
+# ======================================================
+#  SECCIÓN 6625 – 2ª vuelta CACIF vs Aprobación Presupuesto
+# ======================================================
+elif seccion.startswith("6625"):
+    # === Cargar datos ===
+    merged = pd.read_excel(EXCEL_6625, sheet_name="Votos_unidos")
+    merged.columns = [c.strip() for c in merged.columns]
+
+    merged["voto_1"] = merged["voto_1"].map(normalizar_estado)
+    merged["voto_2"] = merged["voto_2"].map(normalizar_estado)
+    merged["bloque_norm"] = merged["bloque_1"].map(normalizar_bloque)
+    merged = agregar_categoria_cambio(merged)
+
+    (favor_1, contra_1, aus_1, lic_1,
+     favor_2, contra_2, aus_2, lic_2) = conteos_por_estado(merged)
+
+    total_iguales, favor_a_contra, contra_a_favor, se_desactivan, se_activan = calcular_kpis_basicos(merged)
+    resultado_texto, bg_color, fg_color = resultado_global(favor_2, contra_2)
+
+    # === Main ===
+    st.title("2ª vuelta 6433 vs Aprobación de Presupuesto - 6625")
+
+    # ---------- Resumen por "vuelta"/evento ----------
+    st.subheader("Resumen de votos por tema")
+
+    # 2ª vuelta participación CACIF (voto_1)
+    st.markdown("### 2ª vuelta participación CACIF")
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">A FAVOR (CACIF 2ª)</div>
+            <div class="metric-value">{favor_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">EN CONTRA (CACIF 2ª)</div>
+            <div class="metric-value">{contra_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">AUSENTE (CACIF 2ª)</div>
+            <div class="metric-value">{aus_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">LICENCIA (CACIF 2ª)</div>
+            <div class="metric-value">{lic_1}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # División visual
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+    # Aprobación de Presupuesto (voto_2)
+    st.markdown("### Aprobación de presupuesto")
+    d1, d2, d3, d4 = st.columns(4)
+
+    with d1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">A FAVOR (Presupuesto)</div>
+            <div class="metric-value">{favor_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with d2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">EN CONTRA (Presupuesto)</div>
+            <div class="metric-value">{contra_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with d3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">AUSENTE (Presupuesto)</div>
+            <div class="metric-value">{aus_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with d4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">LICENCIA (Presupuesto)</div>
+            <div class="metric-value">{lic_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Banner de resultado global (Presupuesto)
+    st.markdown(
+        f"""
+        <div style="
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.6rem;
+            background-color: {bg_color};
+            color: {fg_color};
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 700;">
+            Resultado aprobación de presupuesto: {resultado_texto}
+            <span style="font-weight: 400; margin-left: 1rem;">
+                (A favor: {favor_2}, En contra: {contra_2})
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ---------- KPIs de comportamiento entre CACIF 2ª vs Presupuesto ----------
+    st.subheader("Comportamiento entre 2ª vuelta CACIF y aprobación de presupuesto")
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Mismo sentido de voto", total_iguales)
+    col2.metric("CACIF 2ª A FAVOR → Presupuesto EN CONTRA", favor_a_contra)
+    col3.metric("CACIF 2ª EN CONTRA → Presupuesto A FAVOR", contra_a_favor)
+    col4.metric("Se desactivan (votaban → no)", se_desactivan)
+    col5.metric("Se activan (no votaban → votan)", se_activan)
+
+    st.markdown("---")
+
+    # =======================
+    #  Transiciones por bloque
+    # =======================
+
+    st.subheader("Comparativo por bloque (CACIF 2ª vs Presupuesto)")
+
+    bloques = sorted(merged["bloque_norm"].dropna().unique())
+    bloques = ["TODOS"] + bloques
+
+    bloque_sel = st.selectbox("Selecciona un bloque", options=bloques)
+
+    # Data filtrada por bloque (para heatmap + tabla)
+    if bloque_sel == "TODOS":
+        df_b = merged.copy()
+    else:
+        df_b = merged[merged["bloque_norm"] == bloque_sel].copy()
+
+    # --- Heatmap ---
+    mat_bloque = (
+        df_b
+        .groupby(["voto_1", "voto_2"])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(index=ESTADOS, columns=ESTADOS, fill_value=0)
+    )
+
+    titulo_bloque = "TODOS" if bloque_sel == "TODOS" else bloque_sel
+
+    fig_heat = px.imshow(
+        mat_bloque,
+        text_auto=True,
+        labels=dict(
+            x="Voto en aprobación de presupuesto",
+            y="Voto en 2ª vuelta CACIF",
+            color="Conteo"
+        ),
+        x=mat_bloque.columns,
+        y=mat_bloque.index,
+        title=f"Transiciones de sentido de voto - Bloque {titulo_bloque}",
+    )
+    st.plotly_chart(fig_heat, use_container_width=True)
+
+    # --- Tabla de detalle (mismo filtro de bloque) ---
+    st.markdown(f"### Detalle de diputados del bloque {titulo_bloque}")
+
+    fcol1, fcol2 = st.columns([2, 1])
+
+    with fcol1:
+        tipo_cambio_bloque = st.multiselect(
+            "Filtrar por tipo de comportamiento",
+            options=sorted(df_b["categoria_cambio"].unique()),
+            default=sorted(df_b["categoria_cambio"].unique())
+        )
+
+    with fcol2:
+        opciones_voto2 = ["Todos"] + ESTADOS
+        voto2_sel = st.selectbox(
+            "Filtrar por voto en presupuesto",
+            options=opciones_voto2,
+            index=0
+        )
+
+    df_detalle = df_b[df_b["categoria_cambio"].isin(tipo_cambio_bloque)].copy()
+
+    if voto2_sel != "Todos":
+        df_detalle = df_detalle[df_detalle["voto_2"] == voto2_sel]
+
+    df_detalle = df_detalle.rename(columns={
+        "nombre": "Nombre",
+        "bloque_1": "Bloque",
+        "voto_1": "Voto 2ª CACIF",
+        "voto_2": "Voto Presupuesto",
+        "categoria_cambio": "Categoría de Cambio",
+    })
+
+    df_detalle = df_detalle[
+        ["Nombre", "Bloque", "Voto 2ª CACIF", "Voto Presupuesto", "Categoría de Cambio"]
+    ].sort_values(["Bloque", "Nombre"])
+
+    st.dataframe(df_detalle, use_container_width=True)
+
+    st.markdown("---")
+
+    # =======================
+    #  Gráfico de barras por bloque - todos los cambios
+    # =======================
+
+    st.subheader("Cambios de sentido de voto por bloque")
+
+    resumen_bloques = (
+        merged
+        .groupby(["bloque_norm", "categoria_cambio"])
+        .size()
+        .reset_index(name="Diputados")
+        .rename(columns={
+            "bloque_norm": "Bloque",
+            "categoria_cambio": "Categoría de Cambio"
+        })
+    )
+
+    fig_bar = px.bar(
+        resumen_bloques,
+        x="Bloque",
+        y="Diputados",
+        color="Categoría de Cambio",
+        title="Cambios de sentido de voto por bloque",
+        labels={"Bloque": "Bloque", "Diputados": "Diputados"},
+    )
+
+    fig_bar.update_layout(
+        xaxis_tickangle=-45,
+        xaxis=dict(categoryorder="total descending"),
+        height=700,
+        margin=dict(t=60),
+    )
+
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+    # =======================
+    #  Gráfica stacked: mismo sentido A FAVOR / EN CONTRA por bloque
+    # =======================
+
+    st.subheader("Diputados que mantienen el mismo sentido (A FAVOR / EN CONTRA) en ambos temas")
+
+    df_mantienen = merged[
+        (merged["voto_1"] == merged["voto_2"]) &
+        (merged["voto_1"].isin(["A FAVOR", "EN CONTRA"]))
+    ].copy()
+
+    if df_mantienen.empty:
+        st.info("No hay diputados que mantuvieran A FAVOR o EN CONTRA en ambos temas.")
+    else:
+        resumen_mantienen = (
+            df_mantienen
+            .groupby(["bloque_norm", "voto_2"])
+            .size()
+            .reset_index(name="Diputados")
+            .rename(columns={
+                "bloque_norm": "Bloque",
+                "voto_2": "Voto"
+            })
+        )
+
+        fig_mant = px.bar(
+            resumen_mantienen,
+            x="Bloque",
+            y="Diputados",
+            color="Voto",
+            title="Diputados que mantienen el mismo sentido (CACIF 2ª vs Presupuesto)",
+            labels={"Bloque": "Bloque", "Diputados": "Diputados", "Voto": "Voto"},
+            color_discrete_map={
+                "EN CONTRA": "#e74c3c",  # rojo
+                "A FAVOR": "#27ae60"     # verde
+            },
+        )
+
+        fig_mant.update_layout(
+            barmode="stack",
+            xaxis_tickangle=-45,
+            xaxis=dict(categoryorder="total descending"),
+            height=650,
+            margin=dict(t=60),
+        )
+
+        st.plotly_chart(fig_mant, use_container_width=True)
+
+# ======================================================
+#  SECCIÓN 3 – Solo carga (contenido principal)
+# ======================================================
+else:
+    # Esta rama es solo para que el centro de la pantalla
+    # no se quede en blanco cuando estás en "Carga de Archivos".
+    st.title("Carga de archivos de votaciones")
+    st.markdown("""
+    Usa el panel de la izquierda para cargar los **dos PDFs** que quieres comparar,
+    asignarles un identificador y generar el Excel de entrada para el dashboard.  
+    Puedes reutilizar esta opción cada vez que tengas nuevas votaciones.
+    """)
