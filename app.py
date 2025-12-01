@@ -733,11 +733,36 @@ elif seccion.startswith("6625"):
     st.subheader("Comportamiento entre 2ª vuelta CACIF y aprobación de presupuesto")
 
     col1, col2, col3, col4, col5 = st.columns(5)
+
+    # Métrica normal
     col1.metric("Mismo sentido de voto", total_iguales)
-    col2.metric("CACIF 2ª A FAVOR → Presupuesto EN CONTRA", favor_a_contra)
-    col3.metric("CACIF 2ª EN CONTRA → Presupuesto A FAVOR", contra_a_favor)
+
+    # Métrica 2 con título en dos líneas
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">
+                CACIF 2ª A FAVOR →<br>Presupuesto EN CONTRA
+            </div>
+            <div class="metric-value">{favor_a_contra}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Métrica 3 con título en dos líneas
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">
+                CACIF 2ª EN CONTRA →<br>Presupuesto A FAVOR
+            </div>
+            <div class="metric-value">{contra_a_favor}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Las otras dos siguen igual con st.metric
     col4.metric("Se desactivan (votaban → no)", se_desactivan)
     col5.metric("Se activan (no votaban → votan)", se_activan)
+
 
     st.markdown("---")
 
