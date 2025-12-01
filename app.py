@@ -341,7 +341,7 @@ if seccion.startswith("6433"):
     with t1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">A FAVOR CACIF (2ª)</div>
+            <div class="metric-title">EN CONTRA del CACIF (2ª)</div>
             <div class="metric-value">{favor_2}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -349,7 +349,7 @@ if seccion.startswith("6433"):
     with t2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">EN CONTRA CACIF (2ª)</div>
+            <div class="metric-title">A FAVOR del CACIF (2ª)</div>
             <div class="metric-value">{contra_2}</div>
         </div>
         """, unsafe_allow_html=True)
