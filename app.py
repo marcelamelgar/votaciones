@@ -255,7 +255,7 @@ with st.sidebar:
                         "Si usas el mismo nombre que EXCEL_6433 o EXCEL_6625, "
                         "al recargar la app se actualizarán los dashboards.")
 
-    st.caption("Aquí después metemos más tabs y filtros globales ✨")
+    #st.caption("Aquí después metemos más tabs y filtros globales ✨")
 
 # ======================================================
 #  SECCIÓN 6433 – 1ª vs 2ª vuelta participación CACIF
