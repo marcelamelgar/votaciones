@@ -426,30 +426,48 @@ if seccion.startswith("6433"):
 
     st.markdown("---")
 
-    # BARRAS CAMBIOS
+    # =======================
+    #  Gráfico de barras por bloque - todos los cambios
+    # =======================
+
     st.subheader("Cambios de voto por bloque - Todos los bloques")
 
     resumen_bloques = (
-        merged.groupby(["bloque_norm", "categoria_cambio"])
+        merged
+        .groupby(["bloque_norm", "categoria_cambio"])
         .size()
         .reset_index(name="Diputados")
     )
 
+    # 👉 Renombrar columnas para que el tooltip/leyenda se vean bonitos
+    resumen_bloques = resumen_bloques.rename(columns={
+        "bloque_norm": "Bloque",
+        "categoria_cambio": "Categoría de Cambio",
+    })
+
     fig_bar = px.bar(
         resumen_bloques,
-        x="bloque_norm",
+        x="Bloque",
         y="Diputados",
-        color="categoria_cambio",
-        title="Cambios de voto por bloque",
+        color="Categoría de Cambio",
+        title="Cambios de voto por bloque - Todos los bloques",
+        labels={
+            "Bloque": "Bloque",
+            "Diputados": "Diputados",
+            "Categoría de Cambio": "Categoría de Cambio",
+        },
     )
 
+    # ordenar bloques de mayor a menor total de diputados
     fig_bar.update_layout(
         xaxis_tickangle=-45,
         xaxis=dict(categoryorder="total descending"),
         height=700,
+        margin=dict(t=60),
     )
 
     st.plotly_chart(fig_bar, use_container_width=True)
+
 
     # =======================
     #  Gráfica stacked: se mantienen A FAVOR / EN CONTRA por bloque
