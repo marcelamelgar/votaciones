@@ -451,40 +451,65 @@ if seccion.startswith("6433"):
 
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # STACKED FAVOR/CONTRA
+    # =======================
+    #  Gráfica stacked: se mantienen A FAVOR / EN CONTRA por bloque
+    # =======================
+
     st.subheader("Diputados que mantuvieron su voto (A FAVOR / EN CONTRA) por bloque")
 
     df_mantienen = merged[
         (merged["voto_1"] == merged["voto_2"]) &
         (merged["voto_1"].isin(["A FAVOR", "EN CONTRA"]))
-    ]
+    ].copy()
 
     if df_mantienen.empty:
-        st.info("No hay diputados que se mantuvieran en el mismo sentido.")
+        st.info("No hay diputados que se mantuvieran A FAVOR o EN CONTRA en ambas vueltas.")
     else:
         resumen_mantienen = (
-            df_mantienen.groupby(["bloque_norm", "voto_2"])
+            df_mantienen
+            .groupby(["bloque_norm", "voto_2"])
             .size()
             .reset_index(name="Diputados")
+            .rename(columns={
+                "bloque_norm": "Bloque",
+                "voto_2": "Voto"
+            })
         )
+
+        # ▶️ Etiquetas más bonitas para la leyenda y el tooltip
+        voto_labels = {
+            "A FAVOR": "A favor",
+            "EN CONTRA": "En contra",
+        }
+        resumen_mantienen["Sentido de voto"] = resumen_mantienen["Voto"].map(voto_labels)
 
         fig_mant = px.bar(
             resumen_mantienen,
-            x="bloque_norm",
+            x="Bloque",
             y="Diputados",
-            color="voto_2",
-            barmode="stack",
-            color_discrete_map={"A FAVOR": "#27ae60", "EN CONTRA": "#e74c3c"},
-            title="Diputados que mantuvieron el mismo sentido por bloque",
+            color="Sentido de voto",
+            title="Diputados que mantuvieron el mismo sentido de voto por bloque",
+            labels={
+                "Bloque": "Bloque",
+                "Diputados": "Diputados",
+                "Sentido de voto": "Sentido de voto",
+            },
+            color_discrete_map={
+                "En contra": "#e74c3c",   # rojo
+                "A favor": "#27ae60",     # verde
+            },
         )
 
         fig_mant.update_layout(
+            barmode="stack",
             xaxis_tickangle=-45,
             xaxis=dict(categoryorder="total descending"),
             height=650,
+            margin=dict(t=60),
         )
 
         st.plotly_chart(fig_mant, use_container_width=True)
+
 
 
 # ======================================================
