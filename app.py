@@ -735,7 +735,16 @@ elif seccion.startswith("6625"):
     col1, col2, col3, col4, col5 = st.columns(5)
 
     # Métrica normal
-    col1.metric("Mismo sentido de voto", total_iguales)
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">
+                Mismo sentido de voto
+            </div>
+            <div class="metric-value">{total_iguales}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    #col1.metric("Mismo sentido de voto", total_iguales)
 
     # Métrica 2 con título en dos líneas
     with col2:
@@ -759,9 +768,29 @@ elif seccion.startswith("6625"):
         </div>
         """, unsafe_allow_html=True)
 
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">
+                Se desactivan (votaban → no)
+            </div>
+            <div class="metric-value">{se_desactivan}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col5:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">
+                Se activan (no votaban → votan)
+            </div>
+            <div class="metric-value">{se_activan}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Las otras dos siguen igual con st.metric
-    col4.metric("Se desactivan (votaban → no)", se_desactivan)
-    col5.metric("Se activan (no votaban → votan)", se_activan)
+    ##col4.metric("Se desactivan (votaban → no)", se_desactivan)
+    #col5.metric("Se activan (no votaban → votan)", se_activan)
 
 
     st.markdown("---")
