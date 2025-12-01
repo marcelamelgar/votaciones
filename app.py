@@ -739,7 +739,7 @@ elif seccion.startswith("6625"):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">
-                Mismo sentido de voto
+                Mismo sentido <br>de voto
             </div>
             <div class="metric-value">{total_iguales}</div>
         </div>
@@ -772,7 +772,7 @@ elif seccion.startswith("6625"):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">
-                Se desactivan (votaban → no)
+                Se desactivan (votaban → no votan)
             </div>
             <div class="metric-value">{se_desactivan}</div>
         </div>
