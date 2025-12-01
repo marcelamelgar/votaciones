@@ -206,13 +206,6 @@ def run_markov_pipeline(pdf1_path, id1, pdf2_path, id2):
     Devuelve la ruta del Excel generado.
     """
     # TODO: Reemplaza este bloque con tus scripts reales.
-    # EJEMPLO (pseudocódigo):
-    #
-    #   excel_1 = pdf_to_excel(pdf1_path, id1)
-    #   excel_2 = pdf_to_excel(pdf2_path, id2)
-    #   output_excel = build_dashboard_input(excel_1, excel_2, id1, id2)
-    #
-    # Por ahora solo devolvemos el nombre base de siempre:
     output_excel = "analisis_votaciones.xlsx"
     return output_excel
 
@@ -228,7 +221,6 @@ with st.sidebar:
     )
     st.markdown("---")
 
-    # --- Controles extra SOLO para la opción de carga ---
     if seccion.startswith("Carga"):
         st.subheader("Carga de nuevos PDFs")
 
@@ -254,8 +246,6 @@ with st.sidebar:
                 st.info(f"Excel generado: **{output_excel}**. "
                         "Si usas el mismo nombre que EXCEL_6433 o EXCEL_6625, "
                         "al recargar la app se actualizarán los dashboards.")
-
-    #st.caption("Aquí después metemos más tabs y filtros globales ✨")
 
 # ======================================================
 #  SECCIÓN 6433 – 1ª vs 2ª vuelta participación CACIF
@@ -385,12 +375,12 @@ if seccion.startswith("6433"):
         </div>
         """, unsafe_allow_html=True)
 
-    # Banner de resultado global 2ª vuelta
+    # Banner de resultado global 2ª vuelta (sin números en paréntesis)
     st.markdown(
         f"""
         <div style="
             margin-top: 1rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.0rem;
             padding: 1rem 1.5rem;
             border-radius: 0.6rem;
             background-color: {bg_color};
@@ -399,13 +389,29 @@ if seccion.startswith("6433"):
             font-size: 1.3rem;
             font-weight: 700;">
             Resultado 2ª vuelta: {resultado_texto}
-            <span style="font-weight: 400; margin-left: 1rem;">
-                (A favor: {favor_2}, En contra: {contra_2})
-            </span>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    # NUEVOS CUADROS: A favor / En contra del CACIF (2ª)
+    res1, res2 = st.columns(2)
+
+    with res1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">A FAVOR del CACIF (2ª)</div>
+            <div class="metric-value">{favor_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with res2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">EN CONTRA del CACIF (2ª)</div>
+            <div class="metric-value">{contra_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # ---------- KPIs de comportamiento entre vueltas ----------
     st.subheader("Comportamiento entre 1ª y 2ª vuelta")
@@ -699,13 +705,29 @@ elif seccion.startswith("6625"):
             font-size: 1.3rem;
             font-weight: 700;">
             Resultado aprobación de presupuesto: {resultado_texto}
-            <span style="font-weight: 400; margin-left: 1rem;">
-                (A favor: {favor_2}, En contra: {contra_2})
-            </span>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    # NUEVOS CUADROS: A favor / En contra del CACIF (2ª)
+    res1, res2 = st.columns(2)
+
+    with res1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">A FAVOR del Presupuesto - EN CONTRA de CACIF</div>
+            <div class="metric-value">{favor_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with res2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">EN CONTRA del Presupuesto - A FAVOR de CACIF</div>
+            <div class="metric-value">{contra_2}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # ---------- KPIs de comportamiento entre CACIF 2ª vs Presupuesto ----------
     st.subheader("Comportamiento entre 2ª vuelta CACIF y aprobación de presupuesto")
@@ -887,10 +909,9 @@ elif seccion.startswith("6625"):
 
 # ======================================================
 #  SECCIÓN 3 – Solo carga (contenido principal)
+# (ahora mismo no se usa porque el radio no tiene la opción)
 # ======================================================
 else:
-    # Esta rama es solo para que el centro de la pantalla
-    # no se quede en blanco cuando estás en "Carga de Archivos".
     st.title("Carga de archivos de votaciones")
     st.markdown("""
     Usa el panel de la izquierda para cargar los **dos PDFs** que quieres comparar,
