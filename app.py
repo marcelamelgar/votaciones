@@ -341,7 +341,7 @@ if seccion.startswith("6433"):
     with t1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">EN CONTRA del CACIF (2ª)</div>
+            <div class="metric-title">A FAVOR CACIF (2ª)</div>
             <div class="metric-value">{favor_2}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -349,7 +349,7 @@ if seccion.startswith("6433"):
     with t2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">A FAVOR del CACIF (2ª)</div>
+            <div class="metric-title">EN CONTRA CACIF (2ª)</div>
             <div class="metric-value">{contra_2}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -427,53 +427,29 @@ if seccion.startswith("6433"):
     st.markdown("---")
 
     # BARRAS CAMBIOS
-    # =======================
-    #  Gráfico de barras por bloque - todos los cambios (6433)
-    # =======================
-
     st.subheader("Cambios de voto por bloque - Todos los bloques")
 
-    # Mapeo de nombres igual al dashboard 6625
-    label_map = {
-        "Cambia opinión Favor/Contra": "Cambia opinión Favor/Contra",
-        "Se mantiene": "Se mantiene",
-        "Se desactiva (votaba → no vota)": "Se desactiva (vota → no vota)",
-        "Se activa (no votaba → vota)": "Se activa (no votaba → vota)",
-        "Cambia tipo de no voto": "Cambia tipo de no voto",
-    }
-
     resumen_bloques = (
-        merged
-        .groupby(["bloque_norm", "categoria_cambio"])
+        merged.groupby(["bloque_norm", "categoria_cambio"])
         .size()
         .reset_index(name="Diputados")
     )
-
-    # Aplicar renaming
-    resumen_bloques["Categoría de Cambio"] = resumen_bloques["categoria_cambio"].map(label_map)
 
     fig_bar = px.bar(
         resumen_bloques,
         x="bloque_norm",
         y="Diputados",
-        color="Categoría de Cambio",
+        color="categoria_cambio",
         title="Cambios de voto por bloque",
-        labels={
-            "bloque_norm": "Bloque",
-            "Diputados": "Diputados",
-            "Categoría de Cambio": "Categoría de Cambio"
-        }
     )
 
     fig_bar.update_layout(
         xaxis_tickangle=-45,
         xaxis=dict(categoryorder="total descending"),
         height=700,
-        margin=dict(t=60),
     )
 
     st.plotly_chart(fig_bar, use_container_width=True)
-
 
     # STACKED FAVOR/CONTRA
     st.subheader("Diputados que mantuvieron su voto (A FAVOR / EN CONTRA) por bloque")
