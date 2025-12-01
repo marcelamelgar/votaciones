@@ -45,25 +45,26 @@ h4, h5 {
 }
 
 /* ----- TARJETAS DE MÉTRICA ----- */
+
 .metric-card {
     padding: 1.2rem;
     border-radius: 14px;
-    border: 1px solid var(--border-soft);
-    background-color: #ffffff;
-    box-shadow: 0px 3px 10px rgba(0,0,0,0.07);
+    border: 1px solid var(--border-soft);      /* gris suave */
+    background-color: #ffffff;                 /* fondo blanco */
+    box-shadow: 0px 3px 10px rgba(0,0,0,0.07); /* sombra */
     text-align: center;
 }
 
 .metric-title {
     font-size: 0.95rem;
-    color: var(--main-color);
+    color: var(--main-color);                  /* azul profesional */
     font-weight: 600;
 }
 
 .metric-value {
     font-size: 2.2rem;
     font-weight: 800;
-    color: var(--text-dark);
+    color: var(--text-dark);                   /* gris oscuro */
     margin-top: -8px;
 }
 
@@ -195,17 +196,8 @@ def save_uploaded_file(uploaded_file, prefix="file_"):
         f.write(uploaded_file.getbuffer())
     return path
 
-# === Aquí conectas tus scripts de Markov / PDFs ===
+# === Placeholder para tus scripts de Markov / PDFs ===
 def run_markov_pipeline(pdf1_path, id1, pdf2_path, id2):
-    """
-    Ejecuta tu flujo:
-      1. PDF -> Excel
-      2. Markov / cálculos
-      3. Genera Excel final que alimenta el dashboard.
-
-    Devuelve la ruta del Excel generado.
-    """
-    # TODO: Reemplaza este bloque con tus scripts reales.
     output_excel = "analisis_votaciones.xlsx"
     return output_excel
 
@@ -221,32 +213,9 @@ with st.sidebar:
     )
     st.markdown("---")
 
-    if seccion.startswith("Carga"):
-        st.subheader("Carga de nuevos PDFs")
-
-        pdf1 = st.file_uploader("Archivo PDF 1 (por ejemplo: 2ª vuelta CACIF)", type=["pdf"], key="pdf1")
-        id1 = st.text_input("Identificador 1 (ej. 6433_2v)", key="id1")
-
-        pdf2 = st.file_uploader("Archivo PDF 2 (por ejemplo: Presupuesto)", type=["pdf"], key="pdf2")
-        id2 = st.text_input("Identificador 2 (ej. 6625)", key="id2")
-
-        procesar = st.button("Generar archivo para dashboard")
-
-        if procesar:
-            if not (pdf1 and pdf2 and id1 and id2):
-                st.error("Por favor carga los dos archivos y llena ambos identificadores.")
-            else:
-                with st.spinner("Procesando archivos y generando Excel..."):
-                    pdf1_path = save_uploaded_file(pdf1, prefix="vot1_")
-                    pdf2_path = save_uploaded_file(pdf2, prefix="vot2_")
-
-                    output_excel = run_markov_pipeline(pdf1_path, id1, pdf2_path, id2)
-
-                st.success("Archivos procesados correctamente ✅")
-                st.info(f"Excel generado: **{output_excel}**. "
-                        "Si usas el mismo nombre que EXCEL_6433 o EXCEL_6625, "
-                        "al recargar la app se actualizarán los dashboards.")
-
+# ======================================================
+#  SECCIÓN 6433 – 1ª vs 2ª vuelta participación CACIF
+# ======================================================
 # ======================================================
 #  SECCIÓN 6433 – 1ª vs 2ª vuelta participación CACIF
 # ======================================================
@@ -261,6 +230,7 @@ if seccion.startswith("6433"):
     merged["bloque_norm"] = merged["bloque_1"].map(normalizar_bloque)
     merged = agregar_categoria_cambio(merged)
 
+    # Conteos
     (favor_1, contra_1, aus_1, lic_1,
      favor_2, contra_2, aus_2, lic_2) = conteos_por_estado(merged)
 
@@ -270,35 +240,7 @@ if seccion.startswith("6433"):
     # === Main ===
     st.title("Votaciones Iniciativa 6466")
 
-    # ---------- Resumen por vuelta ----------
     st.subheader("Resumen de votos por vuelta")
-
-    # CSS adicional para tarjetas y divisor
-    st.markdown("""
-    <style>
-    .metric-card {
-        padding: 1rem;
-        border-radius: 12px;
-        border: 1px solid #e6e6e6;
-        background-color: #ffffff;
-        box-shadow: 0px 2px 6px rgba(0,0,0,0.05);
-        text-align: center;
-    }
-    .metric-title {
-        font-size: 0.85rem;
-        color: #5c5c5c;
-    }
-    .metric-value {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-top: -8px;
-    }
-    .divider {
-        border-bottom: 2px solid #dddddd;
-        margin: 1rem 0 1.2rem 0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
     # Primera vuelta
     st.markdown("### Primera vuelta")
@@ -336,7 +278,6 @@ if seccion.startswith("6433"):
         </div>
         """, unsafe_allow_html=True)
 
-    # Línea divisoria entre vueltas
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
     # Segunda vuelta
@@ -375,12 +316,12 @@ if seccion.startswith("6433"):
         </div>
         """, unsafe_allow_html=True)
 
-    # Banner de resultado global 2ª vuelta (sin números en paréntesis)
+    # === Nuevo Banner SIN números ===
     st.markdown(
         f"""
         <div style="
             margin-top: 1rem;
-            margin-bottom: 1.0rem;
+            margin-bottom: 0.8rem;
             padding: 1rem 1.5rem;
             border-radius: 0.6rem;
             background-color: {bg_color};
@@ -394,10 +335,10 @@ if seccion.startswith("6433"):
         unsafe_allow_html=True,
     )
 
-    # NUEVOS CUADROS: A favor / En contra del CACIF (2ª)
-    res1, res2 = st.columns(2)
+    # === NUEVAS TARJETAS: A FAVOR / EN CONTRA CACIF EN 2ª VUELTA ===
+    t1, t2 = st.columns(2)
 
-    with res1:
+    with t1:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">EN CONTRA del CACIF (2ª)</div>
@@ -405,7 +346,7 @@ if seccion.startswith("6433"):
         </div>
         """, unsafe_allow_html=True)
 
-    with res2:
+    with t2:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">A FAVOR del CACIF (2ª)</div>
@@ -413,7 +354,9 @@ if seccion.startswith("6433"):
         </div>
         """, unsafe_allow_html=True)
 
-    # ---------- KPIs de comportamiento entre vueltas ----------
+    st.markdown("---")
+
+    # KPIs comportamiento
     st.subheader("Comportamiento entre 1ª y 2ª vuelta")
 
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -425,33 +368,20 @@ if seccion.startswith("6433"):
 
     st.markdown("---")
 
-    # =======================
-    #  Transiciones por bloque
-    # =======================
-
+    # BLOQUES
     st.subheader("Votaciones por bloque")
 
-    bloques = sorted(merged["bloque_norm"].dropna().unique())
-    bloques = ["TODOS"] + bloques
+    bloques = ["TODOS"] + sorted(merged["bloque_norm"].dropna().unique())
+    bloque_sel = st.selectbox("Selecciona un bloque", bloques)
 
-    bloque_sel = st.selectbox("Selecciona un bloque", options=bloques)
+    df_b = merged if bloque_sel == "TODOS" else merged[merged["bloque_norm"] == bloque_sel]
 
-    # Data filtrada por bloque (para heatmap + tabla)
-    if bloque_sel == "TODOS":
-        df_b = merged.copy()
-    else:
-        df_b = merged[merged["bloque_norm"] == bloque_sel].copy()
-
-    # --- Heatmap ---
     mat_bloque = (
-        df_b
-        .groupby(["voto_1", "voto_2"])
+        df_b.groupby(["voto_1", "voto_2"])
         .size()
         .unstack(fill_value=0)
         .reindex(index=ESTADOS, columns=ESTADOS, fill_value=0)
     )
-
-    titulo_bloque = "TODOS" if bloque_sel == "TODOS" else bloque_sel
 
     fig_heat = px.imshow(
         mat_bloque,
@@ -459,34 +389,24 @@ if seccion.startswith("6433"):
         labels=dict(x="Voto 2ª vuelta", y="Voto 1ª vuelta", color="Conteo"),
         x=mat_bloque.columns,
         y=mat_bloque.index,
-        title=f"Transiciones de voto - Bloque {titulo_bloque}",
+        title=f"Transiciones de voto - Bloque {bloque_sel}",
     )
+
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # --- Tabla de detalle (mismo filtro de bloque) ---
-    st.markdown(f"### Detalle de diputados del bloque {titulo_bloque}")
+    st.markdown(f"### Detalle de diputados del bloque {bloque_sel}")
 
-    # Filtros en dos columnas: tipo de comportamiento (izq) y voto 2ª vuelta (der)
-    fcol1, fcol2 = st.columns([2, 1])
-
-    with fcol1:
+    f1, f2 = st.columns([2, 1])
+    with f1:
         tipo_cambio_bloque = st.multiselect(
             "Filtrar por tipo de comportamiento",
-            options=sorted(df_b["categoria_cambio"].unique()),
-            default=sorted(df_b["categoria_cambio"].unique())
+            sorted(df_b["categoria_cambio"].unique()),
+            default=sorted(df_b["categoria_cambio"].unique()),
         )
+    with f2:
+        voto2_sel = st.selectbox("Filtrar por voto 2ª vuelta", ["Todos"] + ESTADOS)
 
-    with fcol2:
-        opciones_voto2 = ["Todos"] + ESTADOS
-        voto2_sel = st.selectbox(
-            "Filtrar por voto 2ª vuelta",
-            options=opciones_voto2,
-            index=0
-        )
-
-    df_detalle = df_b[df_b["categoria_cambio"].isin(tipo_cambio_bloque)].copy()
-
-    # aplicar filtro por voto 2ª vuelta si no es "Todos"
+    df_detalle = df_b[df_b["categoria_cambio"].isin(tipo_cambio_bloque)]
     if voto2_sel != "Todos":
         df_detalle = df_detalle[df_detalle["voto_2"] == voto2_sel]
 
@@ -498,41 +418,53 @@ if seccion.startswith("6433"):
         "categoria_cambio": "Categoría de Cambio",
     })
 
-    df_detalle = df_detalle[
-        ["Nombre", "Bloque", "Voto 1ª vuelta", "Voto 2ª vuelta", "Categoría de Cambio"]
-    ].sort_values(["Bloque", "Nombre"])
-
-    st.dataframe(df_detalle, use_container_width=True)
+    st.dataframe(
+        df_detalle[["Nombre", "Bloque", "Voto 1ª vuelta", "Voto 2ª vuelta", "Categoría de Cambio"]]
+        .sort_values(["Bloque", "Nombre"]),
+        use_container_width=True
+    )
 
     st.markdown("---")
 
+    # BARRAS CAMBIOS
     # =======================
-    #  Gráfico de barras por bloque - todos los cambios
+    #  Gráfico de barras por bloque - todos los cambios (6433)
     # =======================
 
     st.subheader("Cambios de voto por bloque - Todos los bloques")
+
+    # Mapeo de nombres igual al dashboard 6625
+    label_map = {
+        "Cambia opinión Favor/Contra": "Cambia opinión Favor/Contra",
+        "Se mantiene": "Se mantiene",
+        "Se desactiva (votaba → no vota)": "Se desactiva (vota → no vota)",
+        "Se activa (no votaba → vota)": "Se activa (no votaba → vota)",
+        "Cambia tipo de no voto": "Cambia tipo de no voto",
+    }
 
     resumen_bloques = (
         merged
         .groupby(["bloque_norm", "categoria_cambio"])
         .size()
         .reset_index(name="Diputados")
-        .rename(columns={
-            "bloque_norm": "Bloque",
-            "categoria_cambio": "Categoría de Cambio"
-        })
     )
+
+    # Aplicar renaming
+    resumen_bloques["Categoría de Cambio"] = resumen_bloques["categoria_cambio"].map(label_map)
 
     fig_bar = px.bar(
         resumen_bloques,
-        x="Bloque",
+        x="bloque_norm",
         y="Diputados",
         color="Categoría de Cambio",
         title="Cambios de voto por bloque",
-        labels={"Bloque": "Bloque", "Diputados": "Diputados"},
+        labels={
+            "bloque_norm": "Bloque",
+            "Diputados": "Diputados",
+            "Categoría de Cambio": "Categoría de Cambio"
+        }
     )
 
-    # ordenar bloques de mayor a menor total de diputados
     fig_bar.update_layout(
         xaxis_tickangle=-45,
         xaxis=dict(categoryorder="total descending"),
@@ -542,54 +474,42 @@ if seccion.startswith("6433"):
 
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # =======================
-    #  Gráfica stacked: se mantienen A FAVOR / EN CONTRA por bloque
-    # =======================
 
+    # STACKED FAVOR/CONTRA
     st.subheader("Diputados que mantuvieron su voto (A FAVOR / EN CONTRA) por bloque")
 
     df_mantienen = merged[
         (merged["voto_1"] == merged["voto_2"]) &
         (merged["voto_1"].isin(["A FAVOR", "EN CONTRA"]))
-    ].copy()
+    ]
 
     if df_mantienen.empty:
-        st.info("No hay diputados que se mantuvieran A FAVOR o EN CONTRA en ambas vueltas.")
+        st.info("No hay diputados que se mantuvieran en el mismo sentido.")
     else:
         resumen_mantienen = (
-            df_mantienen
-            .groupby(["bloque_norm", "voto_2"])
+            df_mantienen.groupby(["bloque_norm", "voto_2"])
             .size()
             .reset_index(name="Diputados")
-            .rename(columns={
-                "bloque_norm": "Bloque",
-                "voto_2": "Voto"
-            })
         )
 
         fig_mant = px.bar(
             resumen_mantienen,
-            x="Bloque",
+            x="bloque_norm",
             y="Diputados",
-            color="Voto",
-            title="Diputados que mantuvieron su voto por bloque",
-            labels={"Bloque": "Bloque", "Diputados": "Diputados", "Voto": "Voto"},
-            color_discrete_map={
-                "EN CONTRA": "#e74c3c",  # rojo
-                "A FAVOR": "#27ae60"     # verde
-            },
+            color="voto_2",
+            barmode="stack",
+            color_discrete_map={"A FAVOR": "#27ae60", "EN CONTRA": "#e74c3c"},
+            title="Diputados que mantuvieron el mismo sentido por bloque",
         )
 
-        # barras apiladas y bloques ordenados de mayor a menor total
         fig_mant.update_layout(
-            barmode="stack",
             xaxis_tickangle=-45,
             xaxis=dict(categoryorder="total descending"),
             height=650,
-            margin=dict(t=60),
         )
 
         st.plotly_chart(fig_mant, use_container_width=True)
+
 
 # ======================================================
 #  SECCIÓN 6625 – 2ª vuelta CACIF vs Aprobación Presupuesto
